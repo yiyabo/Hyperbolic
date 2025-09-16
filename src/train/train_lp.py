@@ -272,24 +272,25 @@ class LinkPredictionTrainer:
         }
 
         # 获取训练边和特征
-        edge_index = self.train_data['edge_index'].to(self.device)
+        edge_index = self.train_data.edge_index.to(self.device)
         x = self.features['train'].to(self.device)
 
         # 准备负采样器
         if self.negative_sampler:
             self.negative_sampler.prepare_graph(self.train_data)
 
-        # 计算总批次数
+        # 计算总批次数（向上取整覆盖所有边）
         num_pos_edges = edge_index.size(1)
-        num_batches = max(1, num_pos_edges // self.config.batch_size)
+        batch_size = max(1, self.config.batch_size)
+        num_batches = max(1, math.ceil(num_pos_edges / batch_size))
 
         progress_bar = tqdm(range(num_batches), desc=f"Epoch {self.epoch}",
                           disable=not self.config.debug)
 
         for batch_idx in progress_bar:
             # 批次边采样
-            start_idx = batch_idx * self.config.batch_size
-            end_idx = min(start_idx + self.config.batch_size, num_pos_edges)
+            start_idx = batch_idx * batch_size
+            end_idx = min(start_idx + batch_size, num_pos_edges)
             batch_pos_edges = edge_index[:, start_idx:end_idx]
 
             # 负采样

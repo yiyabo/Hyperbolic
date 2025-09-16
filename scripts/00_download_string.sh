@@ -6,7 +6,7 @@
 set -e  # 遇到错误立即退出
 
 # 配置
-BASE_URL="https://stringdb-downloads.org/download"
+BASE_URL="https://stringdb-static.org/download"
 VERSION="v12.0"
 DATA_DIR="data/raw/string"
 LOG_FILE="logs/download_string.log"
@@ -44,14 +44,21 @@ download_file() {
     local file_type=$3
     local confidence=${4:-""}
 
+    local version_dir="${file_type}.${VERSION}"
+    local extension="txt.gz"
+
+    if [[ "$file_type" == "protein.sequences" ]]; then
+        extension="fa.gz"
+    fi
+
     if [[ -n "$confidence" && "$file_type" == "protein.physical.links" ]]; then
-        local filename="${taxid}.${file_type}.${VERSION}.txt.gz"
-        local url="${BASE_URL}/${file_type}/${VERSION}/${filename}"
+        local filename="${taxid}.${file_type}.${VERSION}.${extension}"
+        local url="${BASE_URL}/${version_dir}/${filename}"
         # 注意: STRING下载页面支持置信度过滤，但需要手动设置参数
         echo "Note: Confidence filtering for ${confidence} should be done during processing" | tee -a "$LOG_FILE"
     else
-        local filename="${taxid}.${file_type}.${VERSION}.txt.gz"
-        local url="${BASE_URL}/${file_type}/${VERSION}/${filename}"
+        local filename="${taxid}.${file_type}.${VERSION}.${extension}"
+        local url="${BASE_URL}/${version_dir}/${filename}"
     fi
 
     local output_path="${DATA_DIR}/${filename}"
