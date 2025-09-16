@@ -15,7 +15,8 @@ LOG_FILE="logs/download_string.log"
 declare -A SPECIES
 SPECIES[human]=9606
 SPECIES[mouse]=10090
-SPECIES[yeast]=559292
+# 字符串数据库中酵母常用TaxID为4932（部分文档写作559292，这里使用4932）
+SPECIES[yeast]=4932
 
 # 文件类型配置
 declare -a FILE_TYPES
