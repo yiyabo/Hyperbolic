@@ -5,15 +5,15 @@ description: "STRING v12.0 Yeast physical interactions for cross-species testing
 # 物种信息
 species:
   name: "Saccharomyces cerevisiae"
-  taxid: 559292
+  taxid: 4932
   common_name: "yeast"
 
 # 数据路径
 raw_data:
-  interactions: "data/raw/string/559292.protein.physical.links.v12.0.txt.gz"
-  protein_info: "data/raw/string/559292.protein.info.v12.0.txt.gz"
-  protein_aliases: "data/raw/string/559292.protein.aliases.v12.0.txt.gz"
-  sequences: "data/raw/string/559292.protein.sequences.v12.0.fa.gz"
+  interactions: "data/raw/string/4932.protein.physical.links.v12.0.txt.gz"
+  protein_info: "data/raw/string/4932.protein.info.v12.0.txt.gz"
+  protein_aliases: "data/raw/string/4932.protein.aliases.v12.0.txt.gz"
+  sequences: "data/raw/string/4932.protein.sequences.v12.0.fa.gz"
 
 processed_data:
   graph: "data/processed/string_yeast_graph.pt"

@@ -16,7 +16,7 @@ REPR_LAYERS=33
 declare -A SPECIES
 SPECIES[human]=9606
 SPECIES[mouse]=10090
-SPECIES[yeast]=559292
+SPECIES[yeast]=4932
 
 # Python环境检查
 check_python_environment() {

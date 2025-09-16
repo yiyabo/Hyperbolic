@@ -212,7 +212,7 @@ Script: 00_download_string.sh
 - protein.aliases.v12.0.txt.gz: Protein aliases for ID mapping
 - protein.sequences.v12.0.fa.gz: Protein sequences
 
-### Yeast (Saccharomyces cerevisiae, NCBI Taxonomy ID: 559292)
+### Yeast (Saccharomyces cerevisiae, NCBI Taxonomy ID: 4932)
 - protein.physical.links.v12.0.txt.gz: Physical interaction links
 - protein.info.v12.0.txt.gz: Protein information
 - protein.aliases.v12.0.txt.gz: Protein aliases for ID mapping

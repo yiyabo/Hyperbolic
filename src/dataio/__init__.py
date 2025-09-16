@@ -55,7 +55,7 @@ SUPPORTED_DATASETS = {
         'description': 'STRING v12.0 Yeast',
         'id_type': 'string_protein',
         'loader_class': STRINGLoader,
-        'taxid': 559292
+        'taxid': 4932
     }
 }
 

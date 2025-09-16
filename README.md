@@ -46,7 +46,7 @@
   - `protein.aliases.v12.0.txt.gz`
 - **序列数据**: `protein.sequences.v12.0.fa.gz`（如需序列）
 
-### 3. 跨物种外测：Mouse（10090）& Yeast（559292）
+### 3. 跨物种外测：Mouse（10090）& Yeast（4932）
 
 #### 选择理由
 - 两个物种注释最完善，跨物种迁移研究中常用
@@ -374,7 +374,7 @@ def load_huri(filepath, id_mapping):
 
 #### 参数设置
 - **置信度阈值**: ≥0.7 或 ≥0.9
-- **物种过滤**: Human(9606), Mouse(10090), Yeast(559292)
+- **物种过滤**: Human(9606), Mouse(10090), Yeast(4932)
 - **链接类型**: 物理相互作用子网络
 
 ### UniProt ID 映射（id_mapping_uniprot.py）
