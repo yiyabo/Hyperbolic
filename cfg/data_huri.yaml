@@ -1,0 +1,51 @@
+# HuRI (Human Reference Interactome) 数据配置
+data_source: "huri"
+description: "Human Reference Interactome - high-quality binary PPIs"
+
+# 数据路径
+raw_data:
+  interactions: "data/raw/huri/HuRI_binaryPPI.tsv"
+  sequences: "data/raw/huri/HuRI_sequences.fasta"
+
+processed_data:
+  graph: "data/processed/huri_graph.pt"
+  node_mapping: "data/processed/huri_node_mapping.json"
+
+# 数据预处理参数
+preprocessing:
+  remove_self_loops: true
+  remove_duplicates: true
+  min_degree: 1
+  directed: false
+
+# ID 映射配置
+id_mapping:
+  source_id_type: "ensembl_gene"
+  target_id_type: "uniprotkb"
+  mapping_file: "data/raw/mapping/huri_uniprot_mapping.tsv"
+
+# 数据统计信息（预期）
+expected_stats:
+  num_proteins: ~17000
+  num_interactions: ~53000
+  avg_degree: ~6.2
+
+# 质量控制
+quality_control:
+  filter_low_confidence: false  # HuRI 已经是高质量数据
+  min_experimental_evidence: 1
+  exclude_predicted: false
+
+# 数据拆分
+split:
+  method: "cold_protein"
+  train_ratio: 0.8
+  val_ratio: 0.1
+  test_ratio: 0.1
+  random_seed: 42
+
+# 特征配置
+features:
+  use_sequence_features: true
+  feature_dir: "features/esm2_650m/human/"
+  feature_type: "esm2_650m_mean"

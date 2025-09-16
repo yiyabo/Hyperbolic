@@ -1,0 +1,94 @@
+# STRING v12.0 Mouse 数据配置
+data_source: "string_mouse"
+description: "STRING v12.0 Mouse physical interactions for cross-species testing"
+
+# 物种信息
+species:
+  name: "Mus musculus"
+  taxid: 10090
+  common_name: "mouse"
+
+# 数据路径
+raw_data:
+  interactions: "data/raw/string/10090.protein.physical.links.v12.0.txt.gz"
+  protein_info: "data/raw/string/10090.protein.info.v12.0.txt.gz"
+  protein_aliases: "data/raw/string/10090.protein.aliases.v12.0.txt.gz"
+  sequences: "data/raw/string/10090.protein.sequences.v12.0.fa.gz"
+
+processed_data:
+  graph: "data/processed/string_mouse_graph.pt"
+  node_mapping: "data/processed/string_mouse_node_mapping.json"
+
+# 数据预处理参数
+preprocessing:
+  remove_self_loops: true
+  remove_duplicates: true
+  min_degree: 1
+  directed: false
+  confidence_thresholds: [700, 900]  # combined_score >= threshold
+
+# STRING 特定配置
+string_config:
+  interaction_types: ["physical"]  # 只使用物理相互作用
+  evidence_channels:
+    - "experiments"
+    - "databases"
+    - "coexpression"
+    - "neighborhood"
+    - "fusion"
+    - "cooccurrence"
+  score_type: "combined_score"
+
+# ID 映射配置
+id_mapping:
+  source_id_type: "string_protein_id"
+  target_id_type: "uniprotkb"
+  mapping_file: "data/raw/mapping/string_mouse_uniprot_mapping.tsv"
+  use_aliases: true
+
+# 数据统计信息（预期）
+expected_stats:
+  num_proteins: ~22000
+  num_interactions_700: ~1800000  # confidence >= 0.7
+  num_interactions_900: ~450000   # confidence >= 0.9
+  avg_degree_700: ~164
+  avg_degree_900: ~41
+
+# 质量控制
+quality_control:
+  min_confidence: 0.7  # 默认最小置信度
+  filter_predicted_only: true
+  require_experimental_evidence: false
+  max_degree: 10000  # 过滤度数过高的hub节点
+
+# 数据用途
+usage:
+  role: "cross_species_test"  # 用于跨物种测试
+  evaluation_only: true
+  zero_shot_transfer: true
+
+# 跨物种配置
+cross_species:
+  reference_species: "human"
+  ortholog_mapping: true
+  ortholog_file: "data/raw/mapping/human_mouse_orthologs.tsv"
+  conservation_analysis: true
+
+# 与人类数据的比较
+human_comparison:
+  ortholog_overlap: true
+  interaction_conservation: true
+  evolutionary_analysis: true
+
+# 特征配置
+features:
+  use_sequence_features: true
+  feature_dir: "features/esm2_650m/mouse/"
+  feature_type: "esm2_650m_mean"
+
+# 下载配置
+download:
+  base_url: "https://stringdb-downloads.org/download/"
+  version: "v12.0"
+  format: "txt.gz"
+  batch_download: true

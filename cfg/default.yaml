@@ -1,0 +1,45 @@
+seed: 42
+device: "cuda"
+log_dir: "runs/"
+
+data:
+  train_graph: "data/processed/human_graph.pt"   # HuRI
+  val_graph:   "data/processed/human_graph.pt"
+  test_graphs:
+    - "data/processed/human_graph.pt"            # 外测-人类（STRING）
+    - "data/processed/mouse_graph.pt"            # 跨物种-鼠
+    - "data/processed/yeast_graph.pt"            # 跨物种-酵母
+  split:
+    mode: "cold_protein"                         # 冷蛋白拆分
+    ratio: [0.8, 0.1, 0.1]
+  negatives:
+    ratio: 5
+    hard_frac: 0.5
+    strategy: "topology_driven"                  # 或 "uniform"
+
+features:
+  kind: "esm2_650m_mean"
+  dir:  "features/esm2_650m/"
+
+model:
+  backbone: "hgcn_lorentz"
+  dim: 128
+  layers: 3
+  curvature: "learnable"                         # 每层可学曲率
+  dropout: 0.1
+  decoder:
+    type: "hyperbolic_distance"
+    tau_learnable: true
+
+optim:
+  name: "riemannian_adam"
+  lr: 1.5e-3
+  weight_decay: 0.0
+  epochs: 100
+  early_stop_patience: 10
+  batch_size: 8192
+
+eval:
+  metrics: ["aupr", "auroc", "hits@10", "calibration"]
+  threshold_opt: "Youden"
+  report_per_graph: true
