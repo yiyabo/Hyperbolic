@@ -222,7 +222,7 @@ class UniProtIDMapper:
             logger.error(f"Request failed: {e}")
             return {}
 
-    def wait_for_job_completion(self, job_id: str, max_wait_time: int = 300) -> bool:
+    def wait_for_job_completion(self, job_id: str, max_wait_time: int = 900) -> bool:
         """
         等待任务完成
 
@@ -245,10 +245,15 @@ class UniProtIDMapper:
             elif status in ['ERROR', 'FAILED']:
                 logger.error(f"Job {job_id} failed: {error}")
                 return False
-            elif status == 'RUNNING':
+            elif status in ['RUNNING', 'NEW', 'PENDING']:
                 logger.info(f"Job {job_id} is still running...")
             else:
-                logger.warning(f"Unknown job status: {status}")
+                # 某些时候会短暂返回 UNKNOWN；尝试直接拉取结果一次
+                logger.warning(f"Unknown job status: {status}, trying to fetch results directly once")
+                results = self.get_mapping_results(job_id)
+                if results:
+                    logger.info(f"Job {job_id} appears finished (results available)")
+                    return True
 
             # 动态调整等待间隔
             time.sleep(wait_interval)
