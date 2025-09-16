@@ -93,12 +93,24 @@ download_file() {
                 local downloaded_size=$(stat -c%s "$output_path" 2>/dev/null || stat -f%z "$output_path" 2>/dev/null || echo "0")
                 echo "  Downloaded file size: ${downloaded_size} bytes" | tee -a "$LOG_FILE"
 
-                # 简单验证：检查是否是gzip文件
-                if file "$output_path" | grep -q "gzip"; then
-                    echo "  File validation passed" | tee -a "$LOG_FILE"
-                    return 0
+                # 简单验证：优先使用gzip校验，其次使用file命令
+                if command -v gzip &> /dev/null; then
+                    if gzip -t "$output_path" 2>>"$LOG_FILE"; then
+                        echo "  File validation passed" | tee -a "$LOG_FILE"
+                        return 0
+                    else
+                        echo "  File validation failed: gzip test failed" | tee -a "$LOG_FILE"
+                    fi
+                elif command -v file &> /dev/null; then
+                    if file "$output_path" | grep -q "gzip"; then
+                        echo "  File validation passed" | tee -a "$LOG_FILE"
+                        return 0
+                    else
+                        echo "  File validation failed: not a valid gzip file" | tee -a "$LOG_FILE"
+                    fi
                 else
-                    echo "  File validation failed: not a valid gzip file" | tee -a "$LOG_FILE"
+                    echo "  Warning: gzip/file command not available, skipping validation" | tee -a "$LOG_FILE"
+                    return 0
                 fi
             else
                 echo "  Download failed: file not found" | tee -a "$LOG_FILE"
