@@ -50,7 +50,7 @@ class UniProtIDMapper:
             'ensembl_gene': 'Ensembl',
             'ensembl_protein': 'Ensembl_PRO',
             'string_protein': 'STRING',
-            'uniprotkb': 'UniProtKB_AC-ID',
+            'uniprotkb': 'UniProtKB',
             'uniprotkb_id': 'UniProtKB-ID',
             'gene_name': 'Gene_Name',
             'hgnc': 'HGNC',
