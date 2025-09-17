@@ -199,24 +199,34 @@ class UniProtIDMapper:
             Dict[str, str]: 映射结果字典
         """
         try:
-            results_url = f"{self.results_url}/{job_id}"
-            response = requests.get(results_url, timeout=30)
+            # UniProt 结果分页：通过 links.next 迭代，size 默认较小
+            mapping: Dict[str, str] = {}
+            url = f"{self.results_url}/{job_id}?format=json&size=500"
 
-            if response.status_code == 200:
+            while url:
+                response = requests.get(url, timeout=60)
+                if response.status_code != 200:
+                    logger.error(f"Failed to get results page: {response.status_code} - {response.text}")
+                    break
+
                 data = response.json()
-                mapping = {}
 
                 for result in data.get('results', []):
                     from_id = result.get('from')
                     to_id = result.get('to')
-                    if from_id and to_id:
+                    if from_id and to_id and from_id not in mapping:
                         mapping[from_id] = to_id
 
-                logger.info(f"Retrieved {len(mapping)} mappings from job {job_id}")
-                return mapping
-            else:
-                logger.error(f"Failed to get results: {response.status_code} - {response.text}")
-                return {}
+                # 下一页链接
+                links = data.get('links', {}) or {}
+                url = links.get('next')
+
+                # 如果没有下一页，但有 redirect 链接，继续跟随
+                if not url and 'self' in links:
+                    url = None
+
+            logger.info(f"Retrieved {len(mapping)} mappings from job {job_id}")
+            return mapping
 
         except requests.exceptions.RequestException as e:
             logger.error(f"Request failed: {e}")
@@ -245,15 +255,8 @@ class UniProtIDMapper:
             elif status in ['ERROR', 'FAILED']:
                 logger.error(f"Job {job_id} failed: {error}")
                 return False
-            elif status in ['RUNNING', 'NEW', 'PENDING']:
+            elif status in ['RUNNING', 'NEW', 'PENDING', 'UNKNOWN']:
                 logger.info(f"Job {job_id} is still running...")
-            else:
-                # 某些时候会短暂返回 UNKNOWN；尝试直接拉取结果一次
-                logger.warning(f"Unknown job status: {status}, trying to fetch results directly once")
-                results = self.get_mapping_results(job_id)
-                if results:
-                    logger.info(f"Job {job_id} appears finished (results available)")
-                    return True
 
             # 动态调整等待间隔
             time.sleep(wait_interval)
