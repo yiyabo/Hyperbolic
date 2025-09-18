@@ -9,7 +9,7 @@ set -e  # 遇到错误立即退出
 ESM_MODEL="esm2_t33_650M_UR50D"
 FEATURE_DIR="features/esm2_650m"
 LOG_FILE="logs/extract_esm650m.log"
-BATCH_SIZE=4096
+BATCH_SIZE=512
 REPR_LAYERS=33
 
 # 物种配置
