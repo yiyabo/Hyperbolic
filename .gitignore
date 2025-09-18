@@ -45,10 +45,11 @@ conda-env/
 # Jupyter Notebook
 .ipynb_checkpoints
 
-# Data files (大文件不提交到git)
-data/raw/
-data/processed/
+# Data files
+# 开发阶段：允许将 data 下的处理结果纳入版本控制
+# 仅忽略体量巨大的特征目录与个别大文件
 features/
+idmapping_selected.tab.gz
 *.h5
 *.hdf5
 *.pkl

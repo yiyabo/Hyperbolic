@@ -1,0 +1,10 @@
+{
+  "train_edges": 102610,
+  "val_edges": 16,
+  "test_edges": 6,
+  "train_nodes": 8115,
+  "val_nodes": 16,
+  "test_nodes": 5,
+  "total_nodes": 8134,
+  "total_edges": 102632
+}

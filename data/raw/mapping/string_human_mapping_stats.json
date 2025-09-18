@@ -1,0 +1,10 @@
+{
+  "total_input_ids": 19699,
+  "successfully_mapped": 19671,
+  "mapping_rate": 0.9985786080511702,
+  "unique_target_ids": 17838,
+  "redundancy_rate": 0.09318285801433582,
+  "unmapped_ids": 28,
+  "species": "human",
+  "taxid": 9606
+}

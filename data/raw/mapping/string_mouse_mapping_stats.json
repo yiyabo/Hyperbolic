@@ -1,0 +1,10 @@
+{
+  "total_input_ids": 21840,
+  "successfully_mapped": 21788,
+  "mapping_rate": 0.9976190476190476,
+  "unique_target_ids": 20006,
+  "redundancy_rate": 0.08178814026069396,
+  "unmapped_ids": 52,
+  "species": "mouse",
+  "taxid": 10090
+}

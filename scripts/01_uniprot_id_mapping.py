@@ -16,6 +16,7 @@ import sys
 from pathlib import Path
 import pandas as pd
 import json
+from typing import Dict, Optional
 
 # 添加src路径
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -113,7 +114,12 @@ def extract_ids_from_string_aliases(aliases_file: str, taxid: int) -> list:
         return []
 
 
-def create_huri_mapping(config_file: str, output_dir: str):
+def create_huri_mapping(
+    config_file: str,
+    output_dir: str,
+    offline: bool = False,
+    local_mapping_path: Optional[str] = None,
+):
     """创建HuRI ID映射"""
     logger = logging.getLogger(__name__)
     logger.info("Creating HuRI ID mapping...")
@@ -136,10 +142,62 @@ def create_huri_mapping(config_file: str, output_dir: str):
         logger.error("No IDs extracted from HuRI")
         return False
 
-    # 创建映射器
     mapper = UniProtIDMapper(cache_dir=f"{output_dir}/cache")
+    output_file = f"{output_dir}/huri_uniprot_mapping.tsv"
 
-    # 执行映射
+    if offline and local_mapping_path:
+        local_path = Path(local_mapping_path)
+        if not local_path.exists():
+            logger.error(
+                "Offline mode enabled but local mapping file not found: %s",
+                local_mapping_path,
+            )
+            return False
+
+        logger.info(f"Using local HuRI mapping file: {local_mapping_path}")
+
+        try:
+            local_df = pd.read_csv(local_path, sep='\t', header=None)
+        except Exception:
+            local_df = pd.read_csv(local_path, sep='\t')
+
+        if local_df.shape[1] < 2:
+            logger.error(
+                "Local mapping file %s must have at least two columns", local_mapping_path
+            )
+            return False
+
+        col_0, col_1 = local_df.columns[:2]
+        normalized = local_df.rename(columns={col_0: 'ensembl_gene', col_1: 'uniprotkb'})
+        normalized = normalized.dropna(subset=['ensembl_gene', 'uniprotkb'])
+
+        filtered = normalized[normalized['ensembl_gene'].isin(ensembl_ids)].copy()
+        if filtered.empty:
+            logger.error("No matching Ensembl IDs found in local mapping file")
+            return False
+
+        # 去重：同一 Ensembl 只保留第一条
+        filtered = filtered.drop_duplicates(subset=['ensembl_gene'])
+
+        filtered.to_csv(output_file, sep='\t', index=False)
+        mapping = dict(zip(filtered['ensembl_gene'], filtered['uniprotkb']))
+
+        stats = mapper.get_mapping_statistics(mapping, ensembl_ids)
+        stats_file = f"{output_dir}/huri_mapping_stats.json"
+        with open(stats_file, 'w') as f:
+            json.dump(stats, f, indent=2)
+
+        logger.info("HuRI mapping statistics (offline):")
+        for key, value in stats.items():
+            if isinstance(value, float):
+                logger.info(f"  {key}: {value:.3f}")
+            else:
+                logger.info(f"  {key}: {value}")
+
+        logger.info(f"HuRI mapping completed successfully: {output_file}")
+        return True
+
+    # 在线模式，调用UniProt API
     def progress_callback(progress, batch_num, total_batches):
         logger.info(f"HuRI mapping progress: {progress:.1%} (batch {batch_num}/{total_batches})")
 
@@ -150,8 +208,6 @@ def create_huri_mapping(config_file: str, output_dir: str):
         progress_callback=progress_callback
     )
 
-    # 保存映射
-    output_file = f"{output_dir}/huri_uniprot_mapping.tsv"
     success = mapper.create_mapping_file(
         ensembl_ids,
         'ensembl_gene',
@@ -161,7 +217,6 @@ def create_huri_mapping(config_file: str, output_dir: str):
     )
 
     if success:
-        # 获取统计信息
         stats = mapper.get_mapping_statistics(mapping, ensembl_ids)
         logger.info("HuRI mapping statistics:")
         for key, value in stats.items():
@@ -182,7 +237,48 @@ def create_huri_mapping(config_file: str, output_dir: str):
         return False
 
 
-def create_string_mapping(config_file: str, output_dir: str):
+def _build_string_mapping_from_aliases(
+    aliases_file: str,
+    expected_ids: Optional[set] = None,
+) -> pd.DataFrame:
+    """从STRING aliases生成 String->UniProt 映射"""
+    logger = logging.getLogger(__name__)
+    logger.info(f"Building STRING mapping from aliases: {aliases_file}")
+
+    aliases_df = pd.read_csv(aliases_file, sep='\t', compression='gzip')
+
+    if 'string_protein_id' not in aliases_df.columns:
+        first_col = aliases_df.columns[0]
+        aliases_df = aliases_df.rename(columns={first_col: 'string_protein_id'})
+
+    if 'alias' not in aliases_df.columns:
+        second_col = aliases_df.columns[1]
+        aliases_df = aliases_df.rename(columns={second_col: 'alias'})
+
+    if 'source' not in aliases_df.columns:
+        logger.error("STRING aliases file must contain 'source' column for offline mapping")
+        return pd.DataFrame(columns=['string_protein_id', 'uniprotkb'])
+
+    mask = aliases_df['source'].str.contains('uniprot', case=False, na=False)
+    subset = aliases_df.loc[mask, ['string_protein_id', 'alias']].dropna()
+    subset = subset.rename(columns={'alias': 'uniprotkb'})
+
+    if subset.empty:
+        logger.warning("No UniProt aliases found in aliases file")
+        return subset
+
+    if expected_ids is not None:
+        subset = subset[subset['string_protein_id'].isin(expected_ids)]
+
+    subset = subset.drop_duplicates(subset=['string_protein_id'])
+    return subset
+
+
+def create_string_mapping(
+    config_file: str,
+    output_dir: str,
+    offline: bool = False,
+):
     """创建STRING ID映射"""
     logger = logging.getLogger(__name__)
     logger.info("Creating STRING ID mapping...")
@@ -208,33 +304,20 @@ def create_string_mapping(config_file: str, output_dir: str):
         logger.error("No STRING protein IDs extracted")
         return False
 
-    # 创建映射器
     mapper = UniProtIDMapper(cache_dir=f"{output_dir}/cache")
-
-    # 执行映射
-    def progress_callback(progress, batch_num, total_batches):
-        logger.info(f"STRING {species_name} mapping progress: {progress:.1%} (batch {batch_num}/{total_batches})")
-
-    mapping = mapper.map_ids_in_batches(
-        string_ids,
-        'string_protein',
-        'uniprotkb',
-        progress_callback=progress_callback
-    )
-
-    # 保存映射
     output_file = f"{output_dir}/string_{species_name}_uniprot_mapping.tsv"
-    success = mapper.create_mapping_file(
-        string_ids,
-        'string_protein',
-        'uniprotkb',
-        output_file,
-        format='tsv'
-    )
 
-    if success:
-        # 获取统计信息
-        stats = mapper.get_mapping_statistics(mapping, string_ids)
+    if offline:
+        mapping_df = _build_string_mapping_from_aliases(aliases_file, set(string_ids))
+
+        if mapping_df.empty:
+            logger.error("Failed to build STRING mapping from aliases")
+            return False
+
+        mapping_dict = dict(zip(mapping_df['string_protein_id'], mapping_df['uniprotkb']))
+        mapping_df.to_csv(output_file, sep='\t', index=False)
+
+        stats = mapper.get_mapping_statistics(mapping_dict, string_ids)
         stats['species'] = species_name
         stats['taxid'] = taxid
 
@@ -252,12 +335,55 @@ def create_string_mapping(config_file: str, output_dir: str):
 
         logger.info(f"STRING {species_name} mapping completed: {output_file}")
         return True
-    else:
-        logger.error(f"Failed to create STRING {species_name} mapping file")
-        return False
+
+    # 在线模式，调用UniProt API
+    def progress_callback(progress, batch_num, total_batches):
+        logger.info(f"STRING {species_name} mapping progress: {progress:.1%} (batch {batch_num}/{total_batches})")
+
+    mapping = mapper.map_ids_in_batches(
+        string_ids,
+        'string_protein',
+        'uniprotkb',
+        progress_callback=progress_callback
+    )
+
+    success = mapper.create_mapping_file(
+        string_ids,
+        'string_protein',
+        'uniprotkb',
+        output_file,
+        format='tsv'
+    )
+
+    if success:
+        stats = mapper.get_mapping_statistics(mapping, string_ids)
+        stats['species'] = species_name
+        stats['taxid'] = taxid
+
+        logger.info(f"STRING {species_name} mapping statistics:")
+        for key, value in stats.items():
+            if isinstance(value, float):
+                logger.info(f"  {key}: {value:.3f}")
+            else:
+                logger.info(f"  {key}: {value}")
+
+        stats_file = f"{output_dir}/string_{species_name}_mapping_stats.json"
+        with open(stats_file, 'w') as f:
+            json.dump(stats, f, indent=2)
+
+        logger.info(f"STRING {species_name} mapping completed: {output_file}")
+        return True
+
+    logger.error(f"Failed to create STRING {species_name} mapping file")
+    return False
 
 
-def create_all_mappings(config_dir: str = "cfg", output_dir: str = "data/raw/mapping"):
+def create_all_mappings(
+    config_dir: str = "cfg",
+    output_dir: str = "data/raw/mapping",
+    offline: bool = False,
+    huri_local_mapping: Optional[str] = None,
+):
     """创建所有ID映射"""
     logger = logging.getLogger(__name__)
     logger.info("Creating all ID mappings...")
@@ -287,9 +413,18 @@ def create_all_mappings(config_dir: str = "cfg", output_dir: str = "data/raw/map
 
         try:
             if name == "huri":
-                success = create_huri_mapping(config_file, output_dir)
+                success = create_huri_mapping(
+                    config_file,
+                    output_dir,
+                    offline=offline,
+                    local_mapping_path=huri_local_mapping,
+                )
             else:
-                success = create_string_mapping(config_file, output_dir)
+                success = create_string_mapping(
+                    config_file,
+                    output_dir,
+                    offline=offline,
+                )
 
             results[name] = success
 
@@ -387,10 +522,29 @@ def main():
     parser.add_argument("--log-level", "-l", default="INFO",
                        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
                        help="日志级别 (default: INFO)")
-    parser.add_argument("--dataset", "-d", choices=["huri", "string_human", "string_mouse", "string_yeast", "all"],
-                       default="all", help="要处理的数据集 (default: all)")
-    parser.add_argument("--validate", "-v", action="store_true",
-                       help="验证现有的映射文件")
+    parser.add_argument(
+        "--dataset",
+        "-d",
+        choices=["huri", "string_human", "string_mouse", "string_yeast", "all"],
+        default="all",
+        help="要处理的数据集 (default: all)",
+    )
+    parser.add_argument(
+        "--validate",
+        "-v",
+        action="store_true",
+        help="验证现有的映射文件",
+    )
+    parser.add_argument(
+        "--offline",
+        action="store_true",
+        help="优先使用本地文件生成映射（STRING 使用 aliases，HuRI 使用本地映射文件）",
+    )
+    parser.add_argument(
+        "--huri-local-mapping",
+        default="data/raw/mapping/ensembl_to_uniprot.tsv",
+        help="离线模式下使用的 Ensembl→UniProt 映射文件路径",
+    )
 
     args = parser.parse_args()
 
@@ -412,13 +566,39 @@ def main():
 
     try:
         if args.dataset == "all":
-            success = create_all_mappings(args.config_dir, args.output_dir)
-        elif args.dataset == "huri":
-            config_file = f"{args.config_dir}/data_huri.yaml"
-            success = create_huri_mapping(config_file, args.output_dir)
+            success = create_all_mappings(
+                args.config_dir,
+                args.output_dir,
+                offline=args.offline,
+                huri_local_mapping=args.huri_local_mapping,
+            )
         else:
-            config_file = f"{args.config_dir}/data_{args.dataset}.yaml"
-            success = create_string_mapping(config_file, args.output_dir)
+            config_map = {
+                "huri": "data_huri.yaml",
+                "string_human": "data_string_human.yaml",
+                "string_mouse": "data_string_mouse.yaml",
+                "string_yeast": "data_string_yeast.yaml",
+            }
+
+            config_file = Path(args.config_dir) / config_map[args.dataset]
+
+            if not config_file.exists():
+                logger.error(f"Config file not found: {config_file}")
+                sys.exit(1)
+
+            if args.dataset == "huri":
+                success = create_huri_mapping(
+                    str(config_file),
+                    args.output_dir,
+                    offline=args.offline,
+                    local_mapping_path=args.huri_local_mapping,
+                )
+            else:
+                success = create_string_mapping(
+                    str(config_file),
+                    args.output_dir,
+                    offline=args.offline,
+                )
 
         if success:
             logger.info("ID mapping completed successfully!")

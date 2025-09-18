@@ -1,0 +1,8 @@
+{
+  "total_input_ids": 8272,
+  "successfully_mapped": 8216,
+  "mapping_rate": 0.9932301740812379,
+  "unique_target_ids": 8162,
+  "redundancy_rate": 0.006572541382667965,
+  "unmapped_ids": 56
+}

@@ -578,11 +578,15 @@ cd ppi-hgcn
 # 2. 安装依赖
 pip install -r requirements.txt
 
-# 3. 下载数据
+# 3. 下载数据（macOS 本地运行时使用 Homebrew Bash）
+# /opt/homebrew/bin/bash scripts/00_download_string.sh
 bash scripts/00_download_string.sh
 
-# 4. ID 映射
+# 4. ID 映射（默认会调用 UniProt API）
+# 如需完全离线，可使用 --offline，并提供本地 Ensembl→UniProt 对照表
 python scripts/01_uniprot_id_mapping.py
+# python scripts/01_uniprot_id_mapping.py --offline \
+#   --huri-local-mapping data/raw/mapping/ensembl_to_uniprot.tsv
 
 # 5. 构建图数据
 python scripts/02_build_graphs.py
@@ -593,6 +597,12 @@ bash scripts/03_extract_esm650m.sh
 # 7. 训练和评估
 bash scripts/04_train_eval.sh
 ```
+
+离线模式说明：
+
+- STRING 映射直接利用 `data/raw/string/*.protein.aliases.v12.0.txt.gz` 生成，对网络无依赖。
+- HuRI 请提前准备 Ensembl → UniProt 对照表（例如从 UniProt FTP 或 Ensembl BioMart 导出的 TSV），默认路径为 `data/raw/mapping/ensembl_to_uniprot.tsv`。
+- 若未提供本地对照表，脚本会自动回退到 UniProt ID Mapping API。
 
 ### 配置自定义
 

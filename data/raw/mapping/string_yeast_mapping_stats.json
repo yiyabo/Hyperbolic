@@ -1,0 +1,10 @@
+{
+  "total_input_ids": 6600,
+  "successfully_mapped": 6594,
+  "mapping_rate": 0.9990909090909091,
+  "unique_target_ids": 5363,
+  "redundancy_rate": 0.18668486502881407,
+  "unmapped_ids": 6,
+  "species": "yeast",
+  "taxid": 4932
+}
