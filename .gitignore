@@ -21,9 +21,12 @@ wheels/
 *.egg
 MANIFEST
 
-# PyTorch
-*.pth
-*.pt
+# PyTorch checkpoints (但保留数据文件)
+checkpoints/*.pth
+checkpoints/*.pt
+runs/*.pt
+*.checkpoint
+# 注意：保留 data/processed/*.pt 作为项目数据
 
 # Virtual environments
 .env
