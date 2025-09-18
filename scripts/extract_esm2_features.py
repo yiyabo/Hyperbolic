@@ -53,6 +53,8 @@ def main():
     p.add_argument("--outdir", required=True)
     p.add_argument("--model", default="esm2_t33_650M_UR50D")
     p.add_argument("--toks_per_batch", type=int, default=2048)
+    p.add_argument("--max_len", type=int, default=1022,
+                   help="max tokens per sequence (excl. BOS/EOS); longer sequences are chunked and mean-aggregated")
     args = p.parse_args()
 
     outdir = Path(args.outdir)
@@ -64,40 +66,68 @@ def main():
     model = model.eval().to(device)
     batch_converter = alphabet.get_batch_converter()
 
-    # Iterate in chunks by toks_per_batch (approx using sequence lengths)
+    # Iterate in chunks by toks_per_batch and chunk long sequences by max_len
     records = list(parse_fasta(Path(args.fasta)))
-    # Pre-filter extremely short sequences
-    records = [(h, s) for h, s in records if len(s) >= 20]
+    records = [(sanitize(h), s) for h, s in records if len(s) >= 20]
 
+    # First handle long sequences individually (chunked processing)
+    long_records = [(h, s) for h, s in records if len(s) > args.max_len]
+    short_records = [(h, s) for h, s in records if len(s) <= args.max_len]
+
+    # Long sequences: process one-by-one in windows of max_len and aggregate mean
+    for h, s in long_records:
+        windows = [s[i:i+args.max_len] for i in range(0, len(s), args.max_len)]
+        # further sub-batch windows to respect toks_per_batch
+        mean_sum = None
+        token_count = 0
+        w_i = 0
+        while w_i < len(windows):
+            budget = args.toks_per_batch
+            pack: List[Tuple[str, str]] = []
+            while w_i < len(windows):
+                need = len(windows[w_i]) + 2
+                if pack and budget - need < 0:
+                    break
+                pack.append((f"{h}_w{w_i}", windows[w_i]))
+                budget -= need
+                w_i += 1
+            _, _, tokens = batch_converter(pack)
+            tokens = tokens.to(device)
+            with torch.no_grad():
+                out = model(tokens, repr_layers=[33])
+                reps = out["representations"][33]
+            for j, (_label, seq) in enumerate(pack):
+                seg = reps[j, 1:-1]
+                if mean_sum is None:
+                    mean_sum = seg.sum(dim=0).cpu()
+                else:
+                    mean_sum += seg.sum(dim=0).cpu()
+                token_count += seg.size(0)
+        rep = (mean_sum / max(token_count, 1))
+        torch.save({"mean_representations": {33: rep}}, outdir / f"{h}.pt")
+
+    # Short sequences: greedy pack under token budget
     i = 0
-    while i < len(records):
-        # Greedy pack by token budget
+    while i < len(short_records):
         budget = args.toks_per_batch
         batch: List[Tuple[str, str]] = []
-        while i < len(records):
-            h, s = records[i]
-            need = len(s) + 2  # BOS + EOS
+        while i < len(short_records):
+            h, s = short_records[i]
+            need = len(s) + 2
             if batch and budget - need < 0:
                 break
-            batch.append((sanitize(h), s))
+            batch.append((h, s))
             budget -= need
             i += 1
-
-        labels = [b[0] for b in batch]
         _, _, tokens = batch_converter(batch)
         tokens = tokens.to(device)
-
         with torch.no_grad():
             out = model(tokens, repr_layers=[33])
             reps = out["representations"][33]
-
-        # Mean pool over tokens excluding BOS/EOS (first/last)
-        for j, label in enumerate(labels):
+        for j, (h, _s) in enumerate(batch):
             rep = reps[j, 1:-1].mean(dim=0).cpu()
-            save_path = outdir / f"{label}.pt"
-            torch.save({"mean_representations": {33: rep}}, save_path)
+            torch.save({"mean_representations": {33: rep}}, outdir / f"{h}.pt")
 
 
 if __name__ == "__main__":
     main()
-
