@@ -174,14 +174,26 @@ extract_esm_features() {
     local temp_output_dir="${output_dir}_temp"
     mkdir -p "$temp_output_dir"
 
-    # ESM提取命令
-    local extract_cmd="python -m esm.extract \
-        --model $ESM_MODEL \
-        --repr_layers $REPR_LAYERS \
-        --include mean \
-        --toks_per_batch $BATCH_SIZE \
-        '$fasta_file' \
-        '$temp_output_dir'"
+    # ESM提取命令（检测CLI存在与否，缺失则回退到本地Python脚本）
+    if python - <<'PY'
+import importlib.util, sys
+sys.exit(0 if importlib.util.find_spec('esm.extract') is not None else 1)
+PY
+    then
+        local extract_cmd="python -m esm.extract \
+            --model $ESM_MODEL \
+            --repr_layers $REPR_LAYERS \
+            --include mean \
+            --toks_per_batch $BATCH_SIZE \
+            '$fasta_file' \
+            '$temp_output_dir'"
+    else
+        local extract_cmd="python scripts/extract_esm2_features.py \
+            --model $ESM_MODEL \
+            --toks_per_batch $BATCH_SIZE \
+            --fasta '$fasta_file' \
+            --outdir '$temp_output_dir'"
+    fi
 
     echo "Running command: $extract_cmd" | tee -a "$LOG_FILE"
 
@@ -193,7 +205,8 @@ extract_esm_features() {
     while [[ $retry_count -lt $max_retries && "$success" == "false" ]]; do
         echo "Extraction attempt $((retry_count + 1))/$max_retries" | tee -a "$LOG_FILE"
 
-        if timeout 7200 bash -c "$extract_cmd" 2>&1 | tee -a "$LOG_FILE"; then
+        set -o pipefail
+        if timeout 7200 bash -lc "$extract_cmd" 2>&1 | tee -a "$LOG_FILE"; then
             success=true
             echo "Feature extraction completed successfully" | tee -a "$LOG_FILE"
         else
