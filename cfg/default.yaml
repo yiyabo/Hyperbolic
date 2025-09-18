@@ -1,6 +1,13 @@
 seed: 42
-device: "cuda"
+device: "cuda:0"  # 明确指定使用第一块GPU
 log_dir: "runs/"
+
+# GPU优化配置
+gpu_config:
+  mixed_precision: true     # 启用混合精度训练（A100支持）
+  compile_model: false      # PyTorch 2.0编译优化（可选）
+  pin_memory: true          # 加速数据传输
+  num_workers: 4           # 数据加载并行
 
 data:
   train_graph: "data/processed/human_graph.pt"   # HuRI
@@ -37,7 +44,7 @@ optim:
   weight_decay: 0.0
   epochs: 100
   early_stop_patience: 10
-  batch_size: 8192
+  batch_size: 16384  # 增大批次大小，充分利用A100显存
 
 eval:
   metrics: ["aupr", "auroc", "hits@10", "calibration"]
